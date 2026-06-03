@@ -1,0 +1,7 @@
+
+What this does in simple terms:
+
+watch: ["src"] → nodemon watches your src/ folder for any changes
+ext: "ts,json" → only restart when .ts or .json files change
+ignore → don't restart when test files change
+exec → when a change is detected, run this command to restart the server

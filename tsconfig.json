@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node10",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+
+// What this does in simple terms:
+
+// target: ES2020 → compile TypeScript down to modern JavaScript
+// module: CommonJS → Node.js understands CommonJS (require style) natively
+// rootDir/outDir → read from src/, compile output goes to dist/
+// strict: true → TypeScript will catch all type errors strictly — good for a large project
+// esModuleInterop → lets you write import express from 'express' instead of import * as express
+// sourceMap → when your app crashes, error points to your .ts file not compiled .js
+
+// What this does in simple terms:
+
+// target: ES2020 → compile TypeScript down to modern JavaScript
+// module: CommonJS → Node.js understands CommonJS (require style) natively
+// rootDir/outDir → read from src/, compile output goes to dist/
+// strict: true → TypeScript will catch all type errors strictly — good for a large project
+// esModuleInterop → lets you write import express from 'express' instead of import * as express
+// sourceMap → when your app crashes, error points to your .ts file not compiled .js
