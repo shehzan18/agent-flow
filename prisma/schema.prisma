@@ -16,6 +16,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   sessions  Session[]
+  workflows Workflow[]
 
   @@map("users")
 }
@@ -32,3 +33,61 @@ model Session {
   @@map("sessions")
 }
 
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  userId      String
+  isActive    Boolean  @default(true) 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nodes Node[]
+  edges Edge[]
+
+  @@map("workflows")
+}
+
+model Node {
+  id         String   @id @default(uuid())
+  workflowId String
+  type       NodeType
+  name       String
+  config     Json     @default("{}")
+  positionX  Float    @default(0)
+  positionY  Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  sourceEdges  Edge[]   @relation("SourceNode")
+  targetEdges  Edge[]   @relation("TargetNode")
+
+  @@map("nodes")
+}
+
+model Edge {
+  id         String   @id @default(uuid())
+  workflowId String
+  source     String
+  target     String
+  createdAt  DateTime @default(now())
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  sourceNode Node     @relation("SourceNode", fields: [source], references: [id], onDelete: Cascade)
+  targetNode Node     @relation("TargetNode", fields: [target], references: [id], onDelete: Cascade)
+
+  @@map("edges")
+}
+
+enum NodeType {
+  input
+  output
+  agent
+  tool
+  rag
+  memory
+  condition
+  approval
+}

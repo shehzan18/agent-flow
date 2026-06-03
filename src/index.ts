@@ -8,6 +8,8 @@ import authRouter from "./modules/auth/auth.routes";
 
 import { connectDatabase } from "./config/database";
 
+import workflowRouter from "./modules/workflows/workflow.routes";
+
 
 const app = express();
 
@@ -32,6 +34,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Routes
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", authRouter);
+app.use("/api/v1", workflowRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
