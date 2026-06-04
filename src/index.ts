@@ -10,6 +10,10 @@ import { connectDatabase } from "./config/database";
 
 import workflowRouter from "./modules/workflows/workflow.routes";
 
+import { redis } from "./config/redis";
+
+import { queueService } from "./modules/queue-system/queue.service";
+
 
 const app = express();
 
@@ -59,6 +63,14 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 async function bootstrap() {
   await connectDatabase();
+
+  await redis.ping();
+  logger.info("Redis connected successfully");
+
+  // Initialize queues
+  queueService.getAgentQueue();
+  logger.info("Queue system initialized");
+
   app.listen(env.PORT, () => {
     logger.info(`AgentFlow running on port ${env.PORT} [${env.NODE_ENV}]`);
   });
