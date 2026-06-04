@@ -16,6 +16,11 @@ import { queueService } from "./modules/queue-system/queue.service";
 
 import executionRouter from "./modules/execution-manager/execution.routes";
 
+import { AgentWorker } from "./modules/worker-system/agent.worker";
+import { RagWorker } from "./modules/worker-system/rag.worker";
+import { MemoryWorker } from "./modules/worker-system/memory.worker";
+
+
 
 const app = express();
 
@@ -73,6 +78,12 @@ async function bootstrap() {
   // Initialize queues
   queueService.getAgentQueue();
   logger.info("Queue system initialized");
+
+  // Start workers
+  new AgentWorker();
+  new RagWorker();
+  new MemoryWorker();
+    logger.info("All workers started");
 
   app.listen(env.PORT, () => {
     logger.info(`AgentFlow running on port ${env.PORT} [${env.NODE_ENV}]`);
