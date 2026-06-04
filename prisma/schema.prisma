@@ -17,6 +17,7 @@ model User {
 
   sessions  Session[]
   workflows Workflow[]
+  executions WorkflowExecution[]
 
   @@map("users")
 }
@@ -45,6 +46,7 @@ model Workflow {
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   nodes Node[]
   edges Edge[]
+  executions WorkflowExecution[]
 
   @@map("workflows")
 }
@@ -90,4 +92,78 @@ enum NodeType {
   memory
   condition
   approval
+}
+
+
+
+model WorkflowExecution {
+  id          String          @id @default(uuid())
+  workflowId  String
+  userId      String
+  status      ExecutionStatus @default(PENDING)
+  input       Json            @default("{}")
+  output      Json?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  workflow      Workflow        @relation(fields: [workflowId], references: [id])
+  user          User            @relation(fields: [userId], references: [id])
+  nodeExecutions NodeExecution[]
+
+  @@map("workflow_executions")
+}
+
+model NodeExecution {
+  id                String              @id @default(uuid())
+  workflowExecutionId String
+  nodeId            String
+  nodeName          String
+  nodeType          String
+  status            NodeExecutionStatus @default(PENDING)
+  input             Json                @default("{}")
+  output            Json?
+  error             String?
+  retryCount        Int                 @default(0)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  latencyMs         Int?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  workflowExecution WorkflowExecution @relation(fields: [workflowExecutionId], references: [id], onDelete: Cascade)
+  agentMessages     AgentMessage[]
+
+  @@map("node_executions")
+}
+
+model AgentMessage {
+  id              String   @id @default(uuid())
+  nodeExecutionId String
+  role            String
+  content         String
+  createdAt       DateTime @default(now())
+
+  nodeExecution NodeExecution @relation(fields: [nodeExecutionId], references: [id], onDelete: Cascade)
+
+  @@map("agent_messages")
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+enum NodeExecutionStatus {
+  PENDING
+  READY
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
 }

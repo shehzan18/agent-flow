@@ -14,6 +14,8 @@ import { redis } from "./config/redis";
 
 import { queueService } from "./modules/queue-system/queue.service";
 
+import executionRouter from "./modules/execution-manager/execution.routes";
+
 
 const app = express();
 
@@ -39,6 +41,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", authRouter);
 app.use("/api/v1", workflowRouter);
+app.use("/api/v1", executionRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
