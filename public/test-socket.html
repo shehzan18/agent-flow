@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AgentFlow Socket Test</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h2>AgentFlow Real-time Test</h2>
+  
+  <div style="margin-bottom: 16px;">
+    <input 
+      id="executionId" 
+      placeholder="Paste executionId here" 
+      style="width: 400px; padding: 8px; font-size: 14px;"
+    />
+    <button onclick="joinRoom()" style="padding: 8px 16px; font-size: 14px;">
+      Join Room
+    </button>
+  </div>
+
+  <div id="log" style="font-family: monospace; white-space: pre; font-size: 14px;"></div>
+
+  <script>
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZTc1YjliNS01M2MzLTRiMGMtOTFhNy0xMjI1OTZmZDI3YTQiLCJpYXQiOjE3ODA2NTcxMzIsImV4cCI6MTc4MDY1ODAzMn0.rCVnZmNazShk-g4u_8wR943EPQE2yXCXkX8MHiCxPvw";
+
+    function log(msg) {
+      document.getElementById("log").innerText += new Date().toLocaleTimeString() + " → " + msg + "\n";
+    }
+
+    const socket = io({
+      auth: { token },
+      transports: ["polling", "websocket"],
+    });
+
+    socket.on("connect", () => {
+      log("✅ Connected: " + socket.id);
+      log("📋 Paste an executionId above and click Join Room");
+    });
+
+    function joinRoom() {
+      const executionId = document.getElementById("executionId").value.trim();
+      if (!executionId) {
+        log("❌ Please paste an executionId first");
+        return;
+      }
+      socket.emit("join:execution", executionId);
+      log("🔗 Joining room for execution: " + executionId);
+    }
+
+    socket.on("joined:execution", (data) => {
+      log("✅ Joined room — waiting for events...");
+    });
+
+    socket.on("execution:started", (data) => {
+      log("🚀 Execution started — " + data.totalNodes + " nodes");
+    });
+
+    socket.on("node:completed", (data) => {
+      log("✅ Node completed: nodeId=" + data.nodeId + " latency=" + data.latencyMs + "ms");
+    });
+
+    socket.on("node:failed", (data) => {
+      log("❌ Node failed: " + JSON.stringify(data));
+    });
+
+    socket.on("workflow:completed", (data) => {
+      log("🎉 WORKFLOW COMPLETED!");
+    });
+
+    socket.on("workflow:failed", (data) => {
+      log("❌ Workflow failed: " + data.error);
+    });
+
+    socket.on("connect_error", (err) => {
+      log("❌ Connection error: " + err.message);
+    });
+
+    socket.on("disconnect", (reason) => {
+      log("⚠️ Disconnected: " + reason);
+    });
+  </script>
+</body>
+</html>

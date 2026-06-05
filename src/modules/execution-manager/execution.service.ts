@@ -7,6 +7,8 @@ import { logger } from "../../config/logger";
 import { JobResult } from "../queue-system/queue.jobs";
 import { NodeState, NodeExecutionState } from "../dag-engine/dependency-resolver";
 
+import { emitToExecution } from "../../config/socket";
+
 const executionRepository = new ExecutionRepository();
 const dagService = new DAGService();
 
@@ -101,6 +103,13 @@ export class ExecutionService {
       }
     }
 
+    emitToExecution(execution.id, "execution:started", {
+    executionId: execution.id,
+    workflowId,
+    totalNodes: workflow.nodes.length,
+    executionPlan,
+    }); // Emit real-time event to clients subscribed to this execution's updates socket rooms 
+
     logger.info("Workflow execution triggered", {
       executionId: execution.id,
       workflowId,
@@ -159,6 +168,13 @@ export class ExecutionService {
           }
         );
       }
+
+      emitToExecution(executionId, "node:completed", {
+        executionId,
+        nodeId,
+        output,
+        latencyMs,
+      }); // Emit real-time event to clients subscribed to this execution's updates socket rooms 
 
       // Load workflow to get edges and all nodes
       const execution = await executionRepository.findExecutionById(executionId);
@@ -265,6 +281,11 @@ export class ExecutionService {
       );
     }
 
+    emitToExecution(executionId, "node:failed", {
+    executionId,
+    nodeId,
+    error,
+    }); // Emit real-time event to clients subscribed to this execution's updates socket rooms
     // Mark workflow as failed
     await this.markWorkflowFailed(executionId, error);
   }
@@ -290,6 +311,12 @@ export class ExecutionService {
       { completedAt: new Date().toISOString() }
     );
 
+    emitToExecution(executionId, "workflow:completed", {
+        executionId,
+        output,
+        completedAt: new Date().toISOString(),
+        }); // Emit real-time event to clients subscribed to this execution's updates socket rooms
+
     logger.info("Workflow execution completed", { executionId });
   }
 
@@ -310,6 +337,12 @@ export class ExecutionService {
       "FAILED",
       { error }
     );
+
+    emitToExecution(executionId, "workflow:failed", {
+    executionId,
+    error,
+    failedAt: new Date().toISOString(),
+    }); // Emit real-time event to clients subscribed to this execution's updates socket rooms
 
     logger.error("Workflow execution failed", { executionId, error });
   }
@@ -423,3 +456,4 @@ export class ExecutionService {
     return executionRepository.findExecutionsByWorkflow(workflowId, userId);
   }
 }
+

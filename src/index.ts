@@ -1,35 +1,36 @@
 import express, { Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
-import healthRouter from "./routes/health.routes";
-import authRouter from "./modules/auth/auth.routes";
-
 import { connectDatabase } from "./config/database";
-
-import workflowRouter from "./modules/workflows/workflow.routes";
-
 import { redis } from "./config/redis";
-
+import { initializeSocket } from "./config/socket";
 import { queueService } from "./modules/queue-system/queue.service";
-
-import executionRouter from "./modules/execution-manager/execution.routes";
-
 import { AgentWorker } from "./modules/worker-system/agent.worker";
 import { RagWorker } from "./modules/worker-system/rag.worker";
 import { MemoryWorker } from "./modules/worker-system/memory.worker";
-
-
+import healthRouter from "./routes/health.routes";
+import authRouter from "./modules/auth/auth.routes";
+import workflowRouter from "./modules/workflows/workflow.routes";
+import executionRouter from "./modules/execution-manager/execution.routes";
+import path from "path";
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
-app.use(cors());
 
-// Body parsing middleware
+
+// Security middleware
+//app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
+app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public"))); // Serve static files from the public directory
 app.use(express.urlencoded({ extended: true }));
 
 // Correlation ID middleware
@@ -70,10 +71,14 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 async function bootstrap() {
+  // Connect database
   await connectDatabase();
 
-  await redis.ping();
-  logger.info("Redis connected successfully");
+  // Create HTTP server
+  const httpServer = createServer(app);
+
+  // Initialize Socket.IO
+  initializeSocket(httpServer);
 
   // Initialize queues
   queueService.getAgentQueue();
@@ -83,9 +88,10 @@ async function bootstrap() {
   new AgentWorker();
   new RagWorker();
   new MemoryWorker();
-    logger.info("All workers started");
+  logger.info("All workers started");
 
-  app.listen(env.PORT, () => {
+  // Start server
+  httpServer.listen(env.PORT, () => {
     logger.info(`AgentFlow running on port ${env.PORT} [${env.NODE_ENV}]`);
   });
 }
