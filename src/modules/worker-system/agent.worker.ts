@@ -4,6 +4,7 @@ import { ExecutionService } from "../execution-manager/execution.service";
 import { queueService } from "../queue-system/queue.service";
 import { logger } from "../../config/logger";
 import { QUEUE_NAMES, QUEUE_CONCURRENCY } from "../queue-system/queue.constants";
+import { AgentService } from "../agents/agent.service";
 import {
   AgentNodeJobData,
   InputNodeJobData,
@@ -14,6 +15,7 @@ import {
 const executionService = new ExecutionService();
 
 export class AgentWorker extends BaseWorker {
+  private agentService = new AgentService();
   constructor() {
     super(QUEUE_NAMES.AGENT, QUEUE_CONCURRENCY.AGENT);
   }
@@ -117,19 +119,15 @@ export class AgentWorker extends BaseWorker {
 
     // Mock agent response for now
     // Week 5: replace with real LLM calls
-    const mockResponse = await this.mockAgentCall(agentType, data.input);
+    const realResponse = await this.realAgentCall(agentType, data.input, data.config);
 
     return {
       success: true,
       nodeId: data.nodeId,
       executionId: data.executionId,
-      output: mockResponse,
+      output: realResponse.output,
       latencyMs: Date.now() - startTime,
-      tokensUsed: {
-        input: 150,
-        output: 200,
-        total: 350,
-      },
+      tokensUsed: realResponse.metadata.tokensUsed
     };
   }
 
@@ -159,47 +157,29 @@ export class AgentWorker extends BaseWorker {
 
   // ─── Mock Agent Call ──────────────────────────────────────────
 
-  private async mockAgentCall(
-    agentType: string,
-    input: Record<string, any>
-  ): Promise<Record<string, any>> {
-    // Simulate LLM latency
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  private async realAgentCall(
+  agentType: string,
+  input: Record<string, any>,
+  config: AgentNodeJobData["config"]
+): Promise<{ output: Record<string, any>; metadata: any }> {
+  const result = await this.agentService.runAgent({
+    agentType: agentType as any,
+    input: {
+      query: input.query || input.input || JSON.stringify(input),
+      context: input,
+    },
+    config: {
+      // Only pass model if it's a valid Gemini model
+      model: config.model?.startsWith("gemini") ? config.model : undefined,
+      maxTokens: config.maxTokens,
+    },
+  });
 
-    const responses: Record<string, any> = {
-      planner: {
-        plan: [
-          "Step 1: Research market data",
-          "Step 2: Analyze competitors",
-          "Step 3: Summarize findings",
-        ],
-        reasoning: "Breaking down the task into manageable steps",
-        input: input.query || input,
-      },
-      researcher: {
-        findings: [
-          "Tesla Q4 2024 revenue: $25.7B",
-          "Market share in EV segment: 18%",
-          "Key competitors: BYD, Rivian, Lucid",
-        ],
-        sources: ["Bloomberg", "Reuters", "Tesla IR"],
-        input: input.query || input,
-      },
-      critic: {
-        review: "Analysis is comprehensive but needs more competitor data",
-        score: 7.5,
-        suggestions: ["Add BYD revenue comparison", "Include European market data"],
-        input: input,
-      },
-      writer: {
-        report: `Executive Summary: Based on our research, Tesla maintains a strong position in the EV market with $25.7B in Q4 revenue. Despite increasing competition from BYD and traditional automakers, Tesla's technological advantage and brand loyalty remain key differentiators.`,
-        wordCount: 52,
-        input: input,
-      },
-    };
-
-    return responses[agentType] || { result: "Agent completed", input };
-  }
+  return {
+    output: result.parsed,
+    metadata: result.metadata,
+  };
+}
 }
 
 

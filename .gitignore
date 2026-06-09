@@ -4,4 +4,4 @@ logs/
 .env
 *.log
 .DS_Store
-prisma/migrations/
+# prisma/migrations/

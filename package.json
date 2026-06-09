@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/shehzan18/agent-flow-#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.8.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.78.0",
