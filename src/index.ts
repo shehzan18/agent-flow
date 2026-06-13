@@ -15,6 +15,7 @@ import healthRouter from "./routes/health.routes";
 import authRouter from "./modules/auth/auth.routes";
 import workflowRouter from "./modules/workflows/workflow.routes";
 import executionRouter from "./modules/execution-manager/execution.routes";
+import ragRoutes from "./modules/rag/rag.routes";
 import path from "path";
 
 const app = express();
@@ -48,6 +49,7 @@ app.use("/api/v1", healthRouter);
 app.use("/api/v1", authRouter);
 app.use("/api/v1", workflowRouter);
 app.use("/api/v1", executionRouter);
+app.use("/api/v1", ragRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

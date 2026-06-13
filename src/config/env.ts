@@ -20,8 +20,10 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
+
   PINECONE_API_KEY: z.string().optional(),
-  PINECONE_INDEX: z.string().optional(),
+  PINECONE_INDEX_HOST: z.string().optional(),
+  PINECONE_INDEX_NAME: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

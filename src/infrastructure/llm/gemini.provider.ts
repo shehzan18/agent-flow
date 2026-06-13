@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import {
   LLMProvider,
   LLMCompletionRequest,
@@ -11,7 +11,7 @@ import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 
 export class GeminiProvider implements LLMProvider {
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenAI;
   private defaultModel: string;
 
   constructor() {
@@ -19,7 +19,7 @@ export class GeminiProvider implements LLMProvider {
       throw new Error("GEMINI_API_KEY is required to use Gemini provider");
     }
 
-    this.client = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+    this.client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
     this.defaultModel = env.GEMINI_MODEL;
   }
 
@@ -34,31 +34,26 @@ export class GeminiProvider implements LLMProvider {
     const modelName = request.model || this.defaultModel;
 
     try {
-      const model = this.client.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          maxOutputTokens: request.maxTokens || 1024,
-          temperature: request.temperature ?? 0.7,
-        },
-        systemInstruction: request.systemPrompt,
-      });
-
       // Convert our format to Gemini's format
-      const geminiMessages = this.convertMessages(request.messages);
+      const contents = this.convertMessages(request.messages);
 
       logger.debug("Calling Gemini", {
         model: modelName,
-        messageCount: geminiMessages.length,
+        messageCount: contents.length,
       });
 
-      const result = await model.generateContent({
-        contents: geminiMessages,
+      const response = await this.client.models.generateContent({
+        model: modelName,
+        contents,
+        config: {
+          maxOutputTokens: request.maxTokens || 2048,
+          temperature: request.temperature ?? 0.7,
+          systemInstruction: request.systemPrompt,
+        },
       });
 
-      const response = result.response;
-      const text = response.text();
+      const text = response.text || "";
       const usage = response.usageMetadata;
-
       const latencyMs = Date.now() - startTime;
 
       logger.info("Gemini call successful", {
@@ -99,12 +94,21 @@ export class GeminiProvider implements LLMProvider {
 
   async embed(text: string): Promise<number[]> {
     try {
-      const model = this.client.getGenerativeModel({
-        model: "text-embedding-004",
+      const response = await this.client.models.embedContent({
+        model: "gemini-embedding-001",
+        contents: text,
+        config: {
+          outputDimensionality: 768,
+        },
       });
 
-      const result = await model.embedContent(text);
-      return result.embedding.values;
+      const embedding = response.embeddings?.[0]?.values;
+
+      if (!embedding) {
+        throw new Error("No embedding returned from Gemini");
+      }
+
+      return embedding;
     } catch (error: any) {
       logger.error("Gemini embedding failed", { error: error.message });
       throw new LLMError(
@@ -117,7 +121,7 @@ export class GeminiProvider implements LLMProvider {
   // Convert our standard message format to Gemini's format
   private convertMessages(messages: LLMMessage[]) {
     return messages
-      .filter((m) => m.role !== "system") // system goes in systemInstruction, not messages
+      .filter((m) => m.role !== "system")
       .map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],

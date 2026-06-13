@@ -8,18 +8,18 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) // @id -> primary key
   email     String   @unique
   password  String
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sessions  Session[]
-  workflows Workflow[]
-  executions WorkflowExecution[]
+  sessions  Session[]      // one to many rs
+  workflows Workflow[]     // **
+  executions WorkflowExecution[]   // ** 
 
-  @@map("users")
+  @@map("users") // table name in the actual database 
 }
 
 model Session {
@@ -29,7 +29,7 @@ model Session {
   expiresAt    DateTime
   createdAt    DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // foreign key 
 
   @@map("sessions")
 }
@@ -48,7 +48,7 @@ model Workflow {
   edges Edge[]
   executions WorkflowExecution[]
 
-  @@map("workflows")
+  @@map("workflows") // table name
 }
 
 model Node {
@@ -151,6 +151,8 @@ model AgentMessage {
   @@map("agent_messages")
 }
 
+
+
 enum ExecutionStatus {
   PENDING
   RUNNING
@@ -166,4 +168,27 @@ enum NodeExecutionStatus {
   COMPLETED
   FAILED
   SKIPPED
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  filename    String
+  originalName String  @map("original_name")
+  fileSize    Int      @map("file_size")
+  mimeType    String   @map("mime_type")
+  chunkCount  Int      @default(0) @map("chunk_count")
+  status      DocumentStatus @default(PENDING)
+  error       String?
+  uploadedBy  String?  @map("uploaded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
