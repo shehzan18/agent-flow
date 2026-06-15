@@ -34,12 +34,44 @@ export class GeminiProvider implements LLMProvider {
     const modelName = request.model || this.defaultModel;
 
     try {
-      // Convert our format to Gemini's format
       const contents = this.convertMessages(request.messages);
+
+      // Append tool results if this is a follow-up call after tool execution
+      if (request.toolResults && request.toolResults.length > 0) {
+        for (const toolResult of request.toolResults) {
+          contents.push({
+            role: "function",
+            parts: [
+              {
+                functionResponse: {
+                  name: toolResult.toolName,
+                  response: toolResult.error
+                    ? { error: toolResult.error }
+                    : { result: toolResult.result },
+                },
+              },
+            ],
+          } as any);
+        }
+      }
+
+      // Convert our tool definitions to Gemini's format
+      const geminiTools =
+        request.tools && request.tools.length > 0
+          ? [
+              {
+                functionDeclarations: this.convertToolsToGeminiFormat(
+                  request.tools
+                ),
+              },
+            ]
+          : undefined;
 
       logger.debug("Calling Gemini", {
         model: modelName,
         messageCount: contents.length,
+        hasTools: !!geminiTools,
+        toolCount: request.tools?.length || 0,
       });
 
       const response = await this.client.models.generateContent({
@@ -49,18 +81,22 @@ export class GeminiProvider implements LLMProvider {
           maxOutputTokens: request.maxTokens || 2048,
           temperature: request.temperature ?? 0.7,
           systemInstruction: request.systemPrompt,
-        },
+          ...(geminiTools && { tools: geminiTools }),
+        } as any,
       });
 
       const text = response.text || "";
       const usage = response.usageMetadata;
       const latencyMs = Date.now() - startTime;
 
+      const functionCalls = this.extractFunctionCalls(response);
+
       logger.info("Gemini call successful", {
         model: modelName,
         latencyMs,
         inputTokens: usage?.promptTokenCount,
         outputTokens: usage?.candidatesTokenCount,
+        functionCallCount: functionCalls.length,
       });
 
       return {
@@ -73,6 +109,7 @@ export class GeminiProvider implements LLMProvider {
         },
         latencyMs,
         finishReason: response.candidates?.[0]?.finishReason,
+        functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
       };
     } catch (error: any) {
       logger.error("Gemini call failed", {
@@ -126,5 +163,50 @@ export class GeminiProvider implements LLMProvider {
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
       }));
+  }
+
+  // Convert our tool definitions to Gemini's functionDeclarations format
+  private convertToolsToGeminiFormat(tools: any[]): any[] {
+    return tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: "object",
+        properties: Object.fromEntries(
+          Object.entries(tool.parameters).map(([key, param]: [string, any]) => [
+            key,
+            {
+              type: param.type,
+              description: param.description,
+              ...(param.enum && { enum: param.enum }),
+            },
+          ])
+        ),
+        required: Object.entries(tool.parameters)
+          .filter(([_, param]: [string, any]) => param.required)
+          .map(([key]) => key),
+      },
+    }));
+  }
+
+  // Extract function calls from Gemini response
+  private extractFunctionCalls(
+    response: any
+  ): Array<{ name: string; arguments: any; callId?: string }> {
+    const calls: Array<{ name: string; arguments: any; callId?: string }> = [];
+
+    const candidate = response.candidates?.[0];
+    if (!candidate?.content?.parts) return calls;
+
+    for (const part of candidate.content.parts) {
+      if (part.functionCall) {
+        calls.push({
+          name: part.functionCall.name,
+          arguments: part.functionCall.args || {},
+        });
+      }
+    }
+
+    return calls;
   }
 }

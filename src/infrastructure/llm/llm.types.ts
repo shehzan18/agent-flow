@@ -1,7 +1,24 @@
+import { ToolDefinition, ToolInput } from "../../modules/tools/tool.types";
+
 // What a message looks like — same as OpenAI/Anthropic chat format
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
   content: string;
+}
+
+// A function call returned by the LLM
+export interface LLMFunctionCall {
+  name: string;
+  arguments: ToolInput;
+  callId?: string;
+}
+
+// Tool result sent back to the LLM
+export interface LLMToolResult {
+  callId?: string;
+  toolName: string;
+  result: any;
+  error?: string;
 }
 
 // Request to the LLM
@@ -11,6 +28,8 @@ export interface LLMCompletionRequest {
   maxTokens?: number;
   temperature?: number;
   systemPrompt?: string;
+  tools?: ToolDefinition[];
+  toolResults?: LLMToolResult[];
 }
 
 // Response from the LLM
@@ -24,6 +43,7 @@ export interface LLMCompletionResponse {
   };
   latencyMs: number;
   finishReason?: string;
+  functionCalls?: LLMFunctionCall[];
 }
 
 // Provider interface — every provider must implement this

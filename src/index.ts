@@ -17,6 +17,7 @@ import workflowRouter from "./modules/workflows/workflow.routes";
 import executionRouter from "./modules/execution-manager/execution.routes";
 import ragRoutes from "./modules/rag/rag.routes";
 import path from "path";
+import { registerAllTools } from "./modules/tools";
 
 const app = express();
 
@@ -85,6 +86,9 @@ async function bootstrap() {
   // Initialize queues
   queueService.getAgentQueue();
   logger.info("Queue system initialized");
+
+  registerAllTools();
+  logger.info("Tools registered");
 
   // Start workers
   new AgentWorker();

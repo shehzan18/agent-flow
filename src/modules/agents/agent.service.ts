@@ -4,8 +4,9 @@ import { CriticAgent } from "./critic.agent";
 import { WriterAgent } from "./writer.agent";
 import { AgentInput, AgentOutput, BaseAgent } from "./base.agent";
 import { logger } from "../../config/logger";
+import { ReActAgent } from "./react-agent";
 
-export type AgentType = "planner" | "researcher" | "critic" | "writer";
+export type AgentType = "planner" | "researcher" | "critic" | "writer" | "react";
 
 export interface RunAgentParams {
   agentType: AgentType;
@@ -28,15 +29,17 @@ export interface ParsedAgentResult {
 export class AgentService {
   private getAgent(agentType: AgentType, providerOverride?: string): BaseAgent {
     switch (agentType) {
-      case "planner":
+    case "planner":
         return new PlannerAgent(providerOverride);
-      case "researcher":
+    case "researcher":
         return new ResearcherAgent(providerOverride);
-      case "critic":
+    case "critic":
         return new CriticAgent(providerOverride);
-      case "writer":
+    case "writer":
         return new WriterAgent(providerOverride);
-      default:
+    case "react":
+        return new ReActAgent(providerOverride);
+    default:
         throw new Error(`Unknown agent type: ${agentType}`);
     }
   }
@@ -49,9 +52,12 @@ export class AgentService {
     const agent = this.getAgent(agentType, config?.providerOverride);
 
     const output = await agent.run(input, {
-      model: config?.model,
-      temperature: config?.temperature,
-      maxTokens: config?.maxTokens,
+    model: config?.model,
+    temperature: config?.temperature,
+    maxTokens: config?.maxTokens,
+    ...(agentType === "react" && config && "allowedTools" in config
+        ? { allowedTools: (config as any).allowedTools }
+        : {}),
     });
 
     // Parse JSON response
