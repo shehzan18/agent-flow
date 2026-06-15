@@ -1,3 +1,4 @@
+import { RagService } from "../rag/rag.service";
 import { Job } from "bullmq";
 import { BaseWorker } from "./worker";
 import { ExecutionService } from "../execution-manager/execution.service";
@@ -9,6 +10,7 @@ import { RagNodeJobData, JobResult } from "../queue-system/queue.jobs";
 const executionService = new ExecutionService();
 
 export class RagWorker extends BaseWorker {
+  private ragService = new RagService();
   constructor() {
     super(QUEUE_NAMES.RAG, QUEUE_CONCURRENCY.RAG);
   }
@@ -54,63 +56,54 @@ export class RagWorker extends BaseWorker {
   }
 
   private async processRagNode(
-    data: RagNodeJobData,
-    startTime: number
-  ): Promise<JobResult> {
-    const { query } = data.input;
-    const { topK = 5, threshold = 0.7 } = data.config;
+  data: RagNodeJobData,
+  startTime: number
+): Promise<JobResult> {
+  const { query } = data.input;
+  const { topK = 5, threshold = 0.7 } = data.config;
 
-    logger.info("Processing RAG node", {
-      executionId: data.executionId,
-      nodeId: data.nodeId,
+  logger.info("Processing RAG node", {
+    executionId: data.executionId,
+    nodeId: data.nodeId,
+    query,
+    topK,
+    threshold,
+  });
+
+  // Real RAG retrieval via Pinecone
+  const results = await this.ragService.search({
+    query,
+    topK,
+    minScore: threshold,
+  });
+
+  // Transform to format expected by downstream agents
+  const chunks = results.map((r) => ({
+    text: r.text,
+    score: r.score,
+    source: r.documentId,
+    chunkId: r.chunkId,
+  }));
+
+  logger.info("RAG retrieval complete", {
+    executionId: data.executionId,
+    nodeId: data.nodeId,
+    chunkCount: chunks.length,
+    topScore: chunks[0]?.score,
+  });
+
+  return {
+    success: true,
+    nodeId: data.nodeId,
+    executionId: data.executionId,
+    output: {
       query,
-      topK,
-      threshold,
-    });
-
-    // Mock RAG retrieval for now
-    // Week 5: replace with real Pinecone search
-    const chunks = await this.mockRagRetrieval(query, topK);
-
-    return {
-      success: true,
-      nodeId: data.nodeId,
-      executionId: data.executionId,
-      output: {
-        query,
-        chunks,
-        chunkCount: chunks.length,
-        retrievedAt: new Date().toISOString(),
-      },
-      latencyMs: Date.now() - startTime,
-    };
-  }
-
-  private async mockRagRetrieval(
-    query: string,
-    topK: number
-  ): Promise<Array<{ text: string; score: number; source: string }>> {
-    // Simulate retrieval latency
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Mock relevant chunks
-    return Array.from({ length: Math.min(topK, 3) }, (_, i) => ({
-      text: `Relevant chunk ${i + 1} for query: "${query}". This contains important information about the topic.`,
-      score: 0.95 - i * 0.05,
-      source: `document_${i + 1}.pdf`,
-    }));
-  }
+      chunks,
+      chunkCount: chunks.length,
+      retrievedAt: new Date().toISOString(),
+    },
+    latencyMs: Date.now() - startTime,
+  };
+}
 }
 
-
-
-// Same pattern as agent worker — extends BaseWorker, implements process(), reports to execution manager. 
-// The only difference is what happens inside processRagNode.
-// RAG node takes a query from input — whatever text needs to be searched against the document store. 
-// The query comes from the previous node's output — for example if a researcher agent ran before this,
-//  its output might contain a specific question that needs document lookup.
-// topK and threshold — two important RAG parameters:
-
-// topK → how many chunks to retrieve. Default 5. More chunks = more context but higher token cost
-// threshold → minimum similarity score to include a chunk. Default 0.7. Higher = more strict, fewer but
-// more relevant results
