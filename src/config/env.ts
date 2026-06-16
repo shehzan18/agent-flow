@@ -24,6 +24,8 @@ const envSchema = z.object({
   PINECONE_API_KEY: z.string().optional(),
   PINECONE_INDEX_HOST: z.string().optional(),
   PINECONE_INDEX_NAME: z.string().optional(),
+
+  TAVILY_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
