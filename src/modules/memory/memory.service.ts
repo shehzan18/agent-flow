@@ -49,7 +49,7 @@ export class MemoryService {
     const topMatch = searchResults[0];
 
     // Only consult the LLM if there's a plausibly-related neighbor
-    const CANDIDATE_FLOOR = 0.55;
+    const CANDIDATE_FLOOR = 0.65;
 
     if (topMatch && topMatch.score >= CANDIDATE_FLOOR) {
       const existing = await this.repo.findById(topMatch.id);
@@ -204,26 +204,32 @@ private async classifyRelationship(
     const llm = getLLMProvider();
 
     const response = await llm.complete({
-        messages: [
-        {
-            role: "user",
-            content: `Compare these two facts and classify their relationship. Respond with EXACTLY one word: "same", "related", or "distinct".
+    messages: [
+      {
+        role: "user",
+        content: `You are deciding how to store a new memory relative to an existing one. Respond with EXACTLY one word: "same", "related", or "distinct".
 
-    - "same": they express the same fact (one should replace the other, even if worded differently)
-    - "related": different but connected facts about the same topic (should be combined)
-    - "distinct": unrelated facts
+- "same": Both state the SAME core fact, just worded differently. (e.g. "lives in Delhi" vs "is based in Delhi"). The new one should replace the old.
+- "related": They state DIFFERENT facts that are about the exact same narrow subject and should be combined into one. Use this RARELY and ONLY when combining them loses no information. (e.g. "likes tea" + "specifically green tea").
+- "distinct": Different facts, even if loosely about the same person or topic. When in doubt, choose this.
 
-    Fact A: "${existing}"
-    Fact B: "${incoming}"
+Examples:
+A: "User is a CSE student" | B: "User wants SDE jobs" → distinct (education vs career goal are different facts)
+A: "User lives in Delhi" | B: "User is based in Delhi" → same
+A: "User likes tea" | B: "User prefers green tea specifically" → related
 
-    Classification:`,
-        },
-        ],
-        temperature: 0,
-        maxTokens: 10,
-    });
+Existing memory: "${existing}"
+New information: "${incoming}"
+
+Classification:`,
+      },
+    ],
+    temperature: 0,
+    maxTokens: 100,
+  });
 
     const answer = response.content.trim().toLowerCase();
+    console.log(`[CLASSIFIER] existing="${existing}" | incoming="${incoming}" | raw response="${response.content}" | parsed="${answer}"`);
 
     if (answer.includes("same")) return "same";
     if (answer.includes("related")) return "related";
@@ -238,20 +244,20 @@ private async classifyRelationship(
     const llm = getLLMProvider();
 
     const response = await llm.complete({
-      messages: [
-        {
-          role: "user",
-          content: `Merge these two related facts into ONE concise memory statement. Keep all important information, remove redundancy, and prefer newer information if they conflict. Respond with ONLY the merged statement, no preamble.
+    messages: [
+      {
+        role: "user",
+        content: `Combine these two facts into ONE sentence that preserves EVERY piece of information from BOTH. Do not drop any detail. Do not summarize away specifics. If they conflict, keep the newer (second) fact. Respond with ONLY the combined statement.
 
-Existing memory: "${existing}"
-New information: "${incoming}"
+Fact 1: "${existing}"
+Fact 2: "${incoming}"
 
-Merged memory:`,
-        },
-      ],
-      temperature: 0.3,
-      maxTokens: 256,
-    });
+Combined (preserving all details):`,
+      },
+    ],
+    temperature: 0.2,
+    maxTokens: 200,
+  });
 
     return response.content.trim().replace(/^["']|["']$/g, "");
   }
