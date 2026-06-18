@@ -49,7 +49,7 @@ model Workflow {
   executions WorkflowExecution[]
 
   @@map("workflows") // table name
-}
+}  
 
 model Node {
   id         String   @id @default(uuid())
@@ -192,3 +192,22 @@ enum DocumentStatus {
   COMPLETED
   FAILED
 }
+
+
+model Memory {
+  id                String   @id @default(uuid())
+  content           String
+  importance        Int      @default(5)
+  userId            String   @map("user_id")
+  accessCount       Int      @default(0) @map("access_count")
+  embeddingProvider String   @default("gemini") @map("embedding_provider")
+  embeddingModel    String   @default("gemini-embedding-001") @map("embedding_model")
+  createdAt         DateTime @default(now()) @map("created_at")
+  lastAccessedAt    DateTime @default(now()) @map("last_accessed_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("memories")
+}
+
+

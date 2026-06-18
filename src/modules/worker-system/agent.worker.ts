@@ -5,6 +5,7 @@ import { queueService } from "../queue-system/queue.service";
 import { logger } from "../../config/logger";
 import { QUEUE_NAMES, QUEUE_CONCURRENCY } from "../queue-system/queue.constants";
 import { AgentService } from "../agents/agent.service";
+import { setMemoryContext, clearMemoryContext } from "../memory/memory.tools";
 import {
   AgentNodeJobData,
   InputNodeJobData,
@@ -119,7 +120,12 @@ export class AgentWorker extends BaseWorker {
 
     // Mock agent response for now
     // Week 5: replace with real LLM calls
-    const realResponse = await this.realAgentCall(agentType, data.input, data.config);
+    const realResponse = await this.realAgentCall(
+      agentType,
+      data.input,
+      data.config,
+      data.userId
+    );
 
     return {
       success: true,
@@ -158,29 +164,40 @@ export class AgentWorker extends BaseWorker {
   // ─── Mock Agent Call ──────────────────────────────────────────
 
   private async realAgentCall(
-  agentType: string,
-  input: Record<string, any>,
-  config: AgentNodeJobData["config"]
-): Promise<{ output: Record<string, any>; metadata: any }> {
-  const result = await this.agentService.runAgent({
-    agentType: agentType as any,
-    input: {
-      query: input.query || input.input || JSON.stringify(input),
-      context: input,
-    },
-    config: {
-      // Only pass model if it's a valid Gemini model
-      model: config.model?.startsWith("gemini") ? config.model : undefined,
-      maxTokens: config.maxTokens,
-    },
-  });
+    agentType: string,
+    input: Record<string, any>,
+    config: AgentNodeJobData["config"],
+    userId: string
+  ): Promise<{ output: Record<string, any>; metadata: any }> {
+    // Set memory context so save_memory / recall_memory tools know the user
+    setMemoryContext(userId);
 
-  return {
-    output: result.parsed,
-    metadata: result.metadata,
-  };
+    try {
+      const result = await this.agentService.runAgent({
+        agentType: agentType as any,
+        input: {
+          query: input.query || input.input || JSON.stringify(input),
+          context: input,
+        },
+        config: {
+          model: config.model?.startsWith("gemini") ? config.model : undefined,
+          maxTokens: config.maxTokens,
+          ...(config as any).allowedTools
+            ? { allowedTools: (config as any).allowedTools }
+            : {},
+        },
+      });
+
+      return {
+        output: result.parsed,
+        metadata: result.metadata,
+      };
+    } finally {
+      clearMemoryContext();
+    }
+  }
 }
-}
+
 
 
 
