@@ -51,6 +51,7 @@ export class ExecutionRepository {
       error?: string;
       startedAt?: Date;
       completedAt?: Date;
+      totalCost?: number;
     }
   ) {
     return prisma.workflowExecution.update({
@@ -108,6 +109,7 @@ export class ExecutionRepository {
       completedAt?: Date;
       latencyMs?: number;
       retryCount?: number;
+      cost?: number;
     }
   ) {
     return prisma.nodeExecution.update({

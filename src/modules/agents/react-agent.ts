@@ -48,14 +48,12 @@ Guidelines:
     return message;
   }
 
-  // Override the base run() method with ReAct loop
   async run(
     input: AgentInput,
     config?: ReActAgentConfig
   ): Promise<AgentOutput> {
     const maxIterations = config?.maxIterations ?? 4;
 
-    // Pick which tools this agent can use
     const tools = config?.allowedTools
       ? toolRegistry.getByNames(config.allowedTools).map((t) => t.definition)
       : toolRegistry.getAllDefinitions();
@@ -66,7 +64,6 @@ Guidelines:
       maxIterations,
     });
 
-    // Build initial messages
     const messages: LLMMessage[] = [];
     if (input.previousMessages) {
       messages.push(...input.previousMessages);
@@ -80,18 +77,14 @@ Guidelines:
     let totalOutputTokens = 0;
     let totalLatency = 0;
     let lastResponse: LLMCompletionResponse | null = null;
-    let pendingToolResults: LLMToolResult[] | undefined = undefined;
 
-    // The ReAct loop
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       logger.debug("ReAct iteration", { iteration: iteration + 1, maxIterations });
 
-      // Call LLM with tools (and any pending tool results from previous turn)
       const response = await this.llm.complete({
         messages,
         systemPrompt: this.getSystemPrompt(),
         tools,
-        toolResults: pendingToolResults,
         model: config?.model,
         temperature: config?.temperature ?? 0.7,
         maxTokens: config?.maxTokens ?? 2048,
@@ -102,10 +95,7 @@ Guidelines:
       totalOutputTokens += response.tokensUsed.output;
       totalLatency += response.latencyMs;
 
-      // Clear pending tool results — they've been consumed by the LLM
-      pendingToolResults = undefined;
-
-      // Check if LLM wants to call tools
+      // LLM wants to call tools
       if (response.functionCalls && response.functionCalls.length > 0) {
         logger.info("LLM requested tool calls", {
           iteration: iteration + 1,
@@ -113,15 +103,14 @@ Guidelines:
           tools: response.functionCalls.map((fc) => fc.name),
         });
 
-        // Add assistant message reflecting it wanted to call tools
-        if (response.content) {
-          messages.push({
-            role: "assistant",
-            content: response.content,
-          });
-        }
+        // Push the assistant message WITH its tool calls (required pairing)
+        messages.push({
+          role: "assistant",
+          content: response.content || "",
+          toolCalls: response.functionCalls,
+        });
 
-        // Execute all the tools the LLM requested
+        // Execute the tools
         const toolCalls = response.functionCalls.map((fc) => ({
           toolName: fc.name,
           arguments: fc.arguments,
@@ -130,21 +119,23 @@ Guidelines:
 
         const results = await this.toolExecutor.executeBatch(toolCalls);
 
-        // Prepare tool results for next iteration
-        pendingToolResults = results.map((result, idx) => ({
-          callId: response.functionCalls![idx].callId,
-          toolName: response.functionCalls![idx].name,
-          result: result.success ? result.output : undefined,
-          error: result.success ? undefined : result.error,
-        }));
+        // Push each tool result as a tool message referencing its call
+        results.forEach((result, idx) => {
+          const fc = response.functionCalls![idx];
+          messages.push({
+            role: "tool",
+            toolCallId: fc.callId,
+            name: fc.name,
+            content: JSON.stringify(
+              result.success ? { result: result.output } : { error: result.error }
+            ),
+          });
+        });
 
-        await new Promise((r) => setTimeout(r, 13000)); // slight delay to ensure tool results are ready before next LLM call
-
-        // Continue the loop — LLM will see tool results in next call
         continue;
       }
 
-      // No tool calls — LLM gave a final answer
+      // No tool calls — final answer
       logger.info("ReAct loop complete — final answer received", {
         iteration: iteration + 1,
         contentLength: response.content.length,
@@ -170,7 +161,6 @@ Guidelines:
       };
     }
 
-    // Reached max iterations without final answer
     logger.warn("ReAct loop hit max iterations", { maxIterations });
 
     return {

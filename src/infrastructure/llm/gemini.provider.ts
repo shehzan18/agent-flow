@@ -159,10 +159,42 @@ export class GeminiProvider implements LLMProvider {
   private convertMessages(messages: LLMMessage[]) {
     return messages
       .filter((m) => m.role !== "system")
-      .map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      }));
+      .map((m) => {
+        // Assistant message that requested tools
+        if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
+          return {
+            role: "model",
+            parts: m.toolCalls.map((tc) => ({
+              functionCall: { name: tc.name, args: tc.arguments || {} },
+            })),
+          };
+        }
+        // Tool result message
+        if (m.role === "tool") {
+          let parsed: any;
+          try {
+            parsed = JSON.parse(m.content);
+          } catch {
+            parsed = { result: m.content };
+          }
+          return {
+            role: "function",
+            parts: [
+              {
+                functionResponse: {
+                  name: m.name || "tool",
+                  response: parsed,
+                },
+              },
+            ],
+          };
+        }
+        // Normal message
+        return {
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        };
+      });
   }
 
   // Convert our tool definitions to Gemini's functionDeclarations format

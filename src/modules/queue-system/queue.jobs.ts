@@ -84,6 +84,7 @@ export interface JobResult {
     total: number;
   };
   latencyMs?: number;
+  model?: string;
 }
 
 // Union type of all possible job data

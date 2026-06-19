@@ -2,8 +2,13 @@ import { ToolDefinition, ToolInput } from "../../modules/tools/tool.types";
 
 // What a message looks like — same as OpenAI/Anthropic chat format
 export interface LLMMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  // When an assistant message requests tools, the calls live here
+  toolCalls?: LLMFunctionCall[];
+  // When a tool message returns a result, it references the call id
+  toolCallId?: string;
+  name?: string;
 }
 
 // A function call returned by the LLM

@@ -1,5 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
-import { getLLMProvider } from "../../infrastructure/llm/llm.factory";
+import {
+  getCompletionProvider,
+  getEmbeddingProvider,
+} from "../../infrastructure/llm/llm.factory";
 import { MemoryRepository } from "./memory.repository";
 import { MemoryStore } from "./memory-store";
 import { MemoryScorer } from "./memory-scorer";
@@ -38,11 +41,11 @@ export class MemoryService {
       contentPreview: input.content.substring(0, 80),
     });
 
-    const llm = getLLMProvider();
-    const providerName = llm.getProviderName();
+    const embedder = getEmbeddingProvider();
+    const providerName = embedder.getProviderName();
 
     // Embed the new memory content
-    const embedding = await llm.embed(input.content);
+    const embedding = await embedder.embed(input.content);
 
     // Search for similar existing memories
     const searchResults = await this.store.search(embedding, userId, 5);
@@ -134,8 +137,8 @@ export class MemoryService {
     await this.repo.updateContent(existingId, input.content, newImportance);
 
     // Update the Pinecone metadata too (re-embed since content changed)
-    const llm = getLLMProvider();
-    const embedding = await llm.embed(input.content);
+    const embedder = getEmbeddingProvider();
+    const embedding = await embedder.embed(input.content);
     await this.store.upsert({
       id: existingId,
       embedding,
@@ -172,8 +175,8 @@ export class MemoryService {
     const newImportance = Math.max(importance, existing.importance);
 
     // Re-embed the merged content
-    const llm = getLLMProvider();
-    const mergedEmbedding = await llm.embed(mergedContent);
+    const embedder = getEmbeddingProvider();
+    const mergedEmbedding = await embedder.embed(mergedContent);
 
     // Update the existing record with merged content
     await this.repo.updateContent(existingId, mergedContent, newImportance);
@@ -201,7 +204,7 @@ private async classifyRelationship(
     existing: string,
     incoming: string
     ): Promise<"same" | "related" | "distinct"> {
-    const llm = getLLMProvider();
+    const llm = getCompletionProvider();
 
     const response = await llm.complete({
     messages: [
@@ -241,7 +244,7 @@ Classification:`,
     existing: string,
     incoming: string
   ): Promise<string> {
-    const llm = getLLMProvider();
+    const llm = getCompletionProvider();
 
     const response = await llm.complete({
     messages: [
@@ -271,8 +274,8 @@ Combined (preserving all details):`,
       queryPreview: query.query.substring(0, 80),
     });
 
-    const llm = getLLMProvider();
-    const queryEmbedding = await llm.embed(query.query);
+    const embedder = getEmbeddingProvider();
+    const queryEmbedding = await embedder.embed(query.query);
 
     // Fetch more candidates than we need, so re-ranking has room to work
     const searchResults = await this.store.search(queryEmbedding, userId, 10);

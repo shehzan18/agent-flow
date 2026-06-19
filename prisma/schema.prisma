@@ -109,6 +109,8 @@ model WorkflowExecution {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  totalCost  Float?  @default(0) @map("total_cost")
+
   workflow      Workflow        @relation(fields: [workflowId], references: [id])
   user          User            @relation(fields: [userId], references: [id])
   nodeExecutions NodeExecution[]
@@ -132,6 +134,8 @@ model NodeExecution {
   latencyMs         Int?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+
+  cost  Float?  @default(0) @map("cost")
 
   workflowExecution WorkflowExecution @relation(fields: [workflowExecutionId], references: [id], onDelete: Cascade)
   agentMessages     AgentMessage[]

@@ -7,6 +7,8 @@ import { logger } from "../../config/logger";
 import { JobResult } from "../queue-system/queue.jobs";
 import { NodeState, NodeExecutionState } from "../dag-engine/dependency-resolver";
 
+import { computeCost, inferProvider } from "../../infrastructure/llm/pricing";
+
 import { emitToExecution } from "../../config/socket";
 
 const executionRepository = new ExecutionRepository();
@@ -157,6 +159,27 @@ export class ExecutionService {
         nodeId
       );
 
+      // Compute cost from token usage + model (agent nodes only; others have no tokens)
+      let nodeCost = 0;
+      const tokensUsed = (result as any).tokensUsed;
+      const model = (result as any).model;
+      if (tokensUsed && model) {
+        const provider = inferProvider(model);
+        nodeCost = computeCost(
+          provider,
+          model,
+          tokensUsed.input || 0,
+          tokensUsed.output || 0
+        );
+        logger.debug("Node cost computed", {
+          model,
+          provider,
+          inputTokens: tokensUsed.input,
+          outputTokens: tokensUsed.output,
+          nodeCost,
+        });
+      }
+
       if (nodeExecution) {
         await executionRepository.updateNodeExecutionStatus(
           nodeExecution.id,
@@ -165,6 +188,7 @@ export class ExecutionService {
             output: output || {},
             completedAt: new Date(),
             latencyMs,
+            cost: nodeCost,
           }
         );
       }
@@ -296,12 +320,23 @@ export class ExecutionService {
     executionId: string,
     output?: Record<string, any>
   ) {
+    // Sum node costs into the execution total
+    const nodeExecutions = await prisma.nodeExecution.findMany({
+      where: { workflowExecutionId: executionId },
+      select: { cost: true },
+    });
+    const totalCost = nodeExecutions.reduce(
+      (sum, n) => sum + (n.cost || 0),
+      0
+    );
+
     await executionRepository.updateExecutionStatus(
       executionId,
       "COMPLETED",
       {
         output: output || {},
         completedAt: new Date(),
+        totalCost,
       }
     );
 

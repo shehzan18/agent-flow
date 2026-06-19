@@ -133,7 +133,8 @@ export class AgentWorker extends BaseWorker {
       executionId: data.executionId,
       output: realResponse.output,
       latencyMs: Date.now() - startTime,
-      tokensUsed: realResponse.metadata.tokensUsed
+      tokensUsed: realResponse.metadata.tokensUsed,
+      model: realResponse.metadata.model,
     };
   }
 

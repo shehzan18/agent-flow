@@ -20,6 +20,9 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
+  
+  LLM_COMPLETION_PROVIDER: z.string().default("gemini"),
+  LLM_EMBEDDING_PROVIDER: z.string().default("gemini"),
 
   PINECONE_API_KEY: z.string().optional(),
   PINECONE_INDEX_HOST: z.string().optional(),

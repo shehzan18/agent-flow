@@ -1,40 +1,49 @@
 import { LLMProvider } from "./llm.types";
 import { GeminiProvider } from "./gemini.provider";
+import { OpenAIProvider } from "./openai.provider";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 
-// Cache providers so we don't create new instances every call
+// Cache provider instances so we don't recreate them on every call
 const providerCache = new Map<string, LLMProvider>();
 
-export function getLLMProvider(providerName?: string): LLMProvider {
-  const name = providerName || env.LLM_PROVIDER;
-
-  // Return cached instance if exists
-  if (providerCache.has(name)) {
-    return providerCache.get(name)!;
-  }
-
-  // Create new provider
-  let provider: LLMProvider;
-
-  switch (name) {
+function buildProvider(name: string): LLMProvider {
+  switch (name.toLowerCase()) {
     case "gemini":
-      provider = new GeminiProvider();
-      break;
-
+      return new GeminiProvider();
     case "openai":
-      throw new Error("OpenAI provider not implemented yet");
-
+      return new OpenAIProvider();
     case "anthropic":
       throw new Error("Anthropic provider not implemented yet");
-
     default:
       throw new Error(`Unknown LLM provider: ${name}`);
   }
+}
 
-  providerCache.set(name, provider);
+function getProvider(name: string): LLMProvider {
+  if (!providerCache.has(name)) {
+    const provider = buildProvider(name);
+    providerCache.set(name, provider);
+    logger.info("LLM provider initialized", { provider: name });
+  }
+  return providerCache.get(name)!;
+}
 
-  logger.info("LLM provider initialized", { provider: name });
+// Provider for completions (agent reasoning, classifier, merge)
+export function getCompletionProvider(): LLMProvider {
+  return getProvider(env.LLM_COMPLETION_PROVIDER);
+}
 
-  return provider;
+// Provider for embeddings (RAG, memory vectors)
+export function getEmbeddingProvider(): LLMProvider {
+  return getProvider(env.LLM_EMBEDDING_PROVIDER);
+}
+
+// Backwards-compatible default — returns the completion provider.
+// Existing code calling getLLMProvider() keeps working.
+export function getLLMProvider(providerOverride?: string): LLMProvider {
+  if (providerOverride) {
+    return getProvider(providerOverride);
+  }
+  return getCompletionProvider();
 }
