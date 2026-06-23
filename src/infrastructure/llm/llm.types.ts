@@ -1,6 +1,6 @@
 import { ToolDefinition, ToolInput } from "../../modules/tools/tool.types";
 
-// What a message looks like — same as OpenAI/Anthropic chat format
+// What a message looks like — same as OpenAI/Anthropic chat format 
 export interface LLMMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;

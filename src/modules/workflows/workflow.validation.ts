@@ -28,6 +28,15 @@ export const createNodeSchema = z.object({
   positionY: z.number().optional().default(0),
 });
 
+export const updateNodeSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  config: z.record(z.string(), z.any()).optional(),
+  positionX: z.number().optional(),
+  positionY: z.number().optional(),
+});
+
+export type UpdateNodeInput = z.infer<typeof updateNodeSchema>;
+
 export const createEdgeSchema = z.object({
   source: z.string().uuid("Source must be a valid node ID"),
   target: z.string().uuid("Target must be a valid node ID"),

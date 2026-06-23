@@ -4,6 +4,7 @@ import {
   UpdateWorkflowInput,
   CreateNodeInput,
   CreateEdgeInput,
+  UpdateNodeInput,
 } from "./workflow.validation";
 
 export class WorkflowRepository {
@@ -98,6 +99,18 @@ export class WorkflowRepository {
       where: {
         id: nodeId,
         workflowId,
+      },
+    });
+  }
+
+  async updateNode(nodeId: string, data: UpdateNodeInput) {
+    return prisma.node.update({
+      where: { id: nodeId },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.config !== undefined && { config: data.config as any }),
+        ...(data.positionX !== undefined && { positionX: data.positionX }),
+        ...(data.positionY !== undefined && { positionY: data.positionY }),
       },
     });
   }

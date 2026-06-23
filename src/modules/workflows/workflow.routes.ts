@@ -29,6 +29,9 @@ router.delete("/workflows/:id", (req, res) =>
 router.post("/workflows/:id/nodes", (req, res) =>
   workflowController.addNode(req as any, res)
 );
+router.patch("/workflows/:id/nodes/:nodeId", (req, res) =>
+  workflowController.updateNode(req as any, res)
+);
 router.delete("/workflows/:id/nodes/:nodeId", (req, res) =>
   workflowController.removeNode(req as any, res)
 );

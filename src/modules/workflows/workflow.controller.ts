@@ -5,6 +5,7 @@ import {
   updateWorkflowSchema,
   createNodeSchema,
   createEdgeSchema,
+  updateNodeSchema,
 } from "./workflow.validation";
 import { AuthRequest } from "../auth/auth.middleware";
 import { logger } from "../../config/logger";
@@ -182,6 +183,51 @@ export class WorkflowController {
       logger.error("Add node error", { error: error.message });
 
       if (error.message === "Workflow not found") {
+        return res.status(404).json({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  async updateNode(req: AuthRequest, res: Response) {
+    try {
+      const { id, nodeId } = req.params;
+
+      const parsed = updateNodeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const node = await workflowService.updateNode(
+        id,
+        nodeId,
+        req.userId!,
+        parsed.data
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Node updated successfully",
+        data: { node },
+      });
+    } catch (error: any) {
+      logger.error("Update node error", { error: error.message });
+
+      if (
+        error.message === "Workflow not found" ||
+        error.message === "Node not found"
+      ) {
         return res.status(404).json({
           success: false,
           message: error.message,

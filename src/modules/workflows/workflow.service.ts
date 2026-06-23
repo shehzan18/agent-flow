@@ -4,6 +4,7 @@ import {
   UpdateWorkflowInput,
   CreateNodeInput,
   CreateEdgeInput,
+  UpdateNodeInput,
 } from "./workflow.validation";
 import { logger } from "../../config/logger";
 
@@ -78,6 +79,34 @@ export class WorkflowService {
     logger.info("Node added", { workflowId, nodeId: node.id, type: node.type });
 
     return node;
+  }
+
+  async updateNode(
+    workflowId: string,
+    nodeId: string,
+    userId: string,
+    data: UpdateNodeInput
+  ) {
+    // Check ownership
+    const belongs = await workflowRepository.workflowBelongsToUser(
+      workflowId,
+      userId
+    );
+    if (!belongs) {
+      throw new Error("Workflow not found");
+    }
+
+    // Check node exists in this workflow
+    const node = await workflowRepository.findNodeById(nodeId, workflowId);
+    if (!node) {
+      throw new Error("Node not found");
+    }
+
+    const updated = await workflowRepository.updateNode(nodeId, data);
+
+    logger.info("Node updated", { workflowId, nodeId });
+
+    return updated;
   }
 
   async removeNode(workflowId: string, nodeId: string, userId: string) {
