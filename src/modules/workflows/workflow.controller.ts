@@ -309,7 +309,8 @@ export class WorkflowController {
 
       if (
         error.message === "A node cannot connect to itself" ||
-        error.message === "Edge already exists between these nodes"
+        error.message === "Edge already exists between these nodes" ||
+        error.message.startsWith("Cycle detected")
       ) {
         return res.status(400).json({
           success: false,

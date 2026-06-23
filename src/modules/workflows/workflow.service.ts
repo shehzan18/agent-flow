@@ -7,8 +7,11 @@ import {
   UpdateNodeInput,
 } from "./workflow.validation";
 import { logger } from "../../config/logger";
+import { DAGService } from "../dag-engine/dag.service";
+import { prisma } from "../../config/database";
 
 const workflowRepository = new WorkflowRepository();
+const dagService = new DAGService();
 
 export class WorkflowService {
   // ─── Workflow Operations ──────────────────────────────────────
@@ -165,6 +168,7 @@ export class WorkflowService {
     }
 
     // Prevent duplicate edges
+    // Prevent duplicate edges
     const exists = await workflowRepository.edgeExists(
       workflowId,
       data.source,
@@ -172,6 +176,22 @@ export class WorkflowService {
     );
     if (exists) {
       throw new Error("Edge already exists between these nodes");
+    }
+
+    // Prevent cycles — load current graph and test the new edge
+    const workflow = await prisma.workflow.findFirst({
+      where: { id: workflowId, userId, isActive: true },
+      include: { nodes: true, edges: true },
+    });
+    if (workflow) {
+      const check = dagService.validateNewEdge(
+        workflow.nodes.map((n) => ({ id: n.id })),
+        workflow.edges.map((e) => ({ source: e.source, target: e.target })),
+        { source: data.source, target: data.target }
+      );
+      if (!check.isValid) {
+        throw new Error(check.error || "This connection would create a cycle");
+      }
     }
 
     const edge = await workflowRepository.createEdge(workflowId, data);
