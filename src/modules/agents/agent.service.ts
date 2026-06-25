@@ -71,28 +71,66 @@ export class AgentService {
     };
   }
 
+  // private parseJSONResponse(content: string): Record<string, any> {
+  //   try {
+  //     // Try direct parse first
+  //     return JSON.parse(content);
+  //   } catch (e) {
+  //     // Strip markdown code blocks if present
+  //     const cleaned = this.stripMarkdownCodeBlocks(content);
+
+  //     try {
+  //       return JSON.parse(cleaned);
+  //     } catch (e2) {
+  //       logger.warn("Failed to parse agent JSON response", {
+  //         content: content.substring(0, 200),
+  //       });
+
+  //       // Return content wrapped — don't crash the whole workflow
+  //       return {
+  //         _rawText: content,
+  //         _parseError: true,
+  //       };
+  //     }
+  //   }
+  // }
+
   private parseJSONResponse(content: string): Record<string, any> {
+    // 1. Try direct parse
     try {
-      // Try direct parse first
       return JSON.parse(content);
-    } catch (e) {
-      // Strip markdown code blocks if present
-      const cleaned = this.stripMarkdownCodeBlocks(content);
+    } catch {}
 
+    // 2. Strip markdown code fences and try again
+    const cleaned = this.stripMarkdownCodeBlocks(content);
+    try {
+      return JSON.parse(cleaned);
+    } catch {}
+
+    // 3. Extract the first {...} block from surrounding text and try that
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
       try {
-        return JSON.parse(cleaned);
-      } catch (e2) {
-        logger.warn("Failed to parse agent JSON response", {
-          content: content.substring(0, 200),
-        });
+        return JSON.parse(match[0]);
+      } catch {}
 
-        // Return content wrapped — don't crash the whole workflow
-        return {
-          _rawText: content,
-          _parseError: true,
-        };
-      }
+      // 4. Last resort on the extracted block: escape stray backslashes
+      //    (LaTeX like \[ ... \] breaks JSON.parse)
+      try {
+        const escaped = match[0].replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+        return JSON.parse(escaped);
+      } catch {}
     }
+
+    // 5. Genuinely not JSON (e.g. a ReAct agent's plain-text answer).
+    //    Treat the text itself as the answer — clean, not an error blob.
+    logger.debug("Agent returned plain text (not JSON) — using as answer", {
+      preview: content.substring(0, 120),
+    });
+    return {
+      answer: content.trim(),
+      summary: content.trim(),
+    };
   }
 
   private stripMarkdownCodeBlocks(content: string): string {

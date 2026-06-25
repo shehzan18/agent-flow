@@ -52,7 +52,7 @@ Guidelines:
     input: AgentInput,
     config?: ReActAgentConfig
   ): Promise<AgentOutput> {
-    const maxIterations = config?.maxIterations ?? 4;
+    const maxIterations = config?.maxIterations ?? 8;
 
     const tools = config?.allowedTools
       ? toolRegistry.getByNames(config.allowedTools).map((t) => t.definition)
