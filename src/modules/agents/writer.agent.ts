@@ -17,6 +17,11 @@ Writing guidelines:
 - No fluff or filler
 - Markdown formatting allowed in the report itself
 
+Formatting rules (important):
+- Use standard markdown only: # headers, **bold**, and - or 1. lists.
+- Write all math and notation in PLAIN TEXT. For example: "O(n log n)", "O(n^2)", "10^4 elements", "x times y".
+- NEVER use LaTeX. Do not use \\[ \\], \\( \\), or backslash commands like \\log, \\times, \\frac. Write them in plain words instead.
+
 Output rules:
 - Always respond in valid JSON format
 - The "report" field contains the actual written content (can use markdown inside)
@@ -37,6 +42,7 @@ Output format:
     "main point 3"
   ]
 }`;
+  
   }
 
   protected formatUserMessage(input: AgentInput): string {
