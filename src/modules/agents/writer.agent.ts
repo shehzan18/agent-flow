@@ -57,8 +57,22 @@ Output format:
         message += `Original plan that was followed:\n${JSON.stringify(input.context.plan, null, 2)}\n\n`;
       }
 
-      if (input.context.review) {
-        message += `Critic feedback to address:\n${JSON.stringify(input.context.review, null, 2)}\n\n`;
+      const hasCritique =
+        input.context.review ||
+        input.context.verdict ||
+        input.context.weaknesses ||
+        input.context.suggestions;
+
+      if (hasCritique) {
+        const critique = input.context.review ?? {
+          strengths: input.context.strengths,
+          weaknesses: input.context.weaknesses,
+          suggestions: input.context.suggestions,
+          overallScore: input.context.overallScore,
+          verdict: input.context.verdict,
+          reasoning: input.context.reasoning,
+        };
+        message += `Quality considerations from a reviewer (incorporate these to strengthen the work — address the weaknesses and apply the suggestions, but produce the final deliverable itself, NOT a critique or review of it):\n${JSON.stringify(critique, null, 2)}\n\n`;
       }
 
       if (input.context.chunks) {

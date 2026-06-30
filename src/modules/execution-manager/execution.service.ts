@@ -247,8 +247,38 @@ export class ExecutionService {
       const readyNodes = dagService.getNextReadyNodes(edges, nodeStates);
 
       // Push ready nodes to queue
+      // Fetch all node executions once, so we can gather parent outputs for fan-in nodes
+      const allNodeExecutions = await executionRepository.findAllNodeExecutions(executionId);
+
+      // Push ready nodes to queue
       for (const readyNode of readyNodes) {
         const node = workflow.nodes.find((n) => n.id === readyNode.nodeId)!;
+
+        // Find this node's parents (nodes with an edge pointing INTO it)
+        const parentIds = edges
+          .filter((e) => e.target === readyNode.nodeId)
+          .map((e) => e.source);
+
+        const parentExecutions = allNodeExecutions.filter((ne) =>
+          parentIds.includes(ne.nodeId)
+        );
+
+        // Build the input by merging ALL parent outputs (fixes fan-in output loss).
+        // Each parent's output is spread in, so keys like `findings` (researcher)
+        // and `review` (critic) both reach a fan-in node.
+        let mergedInput: Record<string, any> = {
+          query: (execution.input as any)?.query,
+        };
+        for (const parentExec of parentExecutions) {
+          const parentOutput = (parentExec.output as Record<string, any>) || {};
+          mergedInput = { ...mergedInput, ...parentOutput };
+        }
+
+        // If for some reason there are no parent executions yet (e.g. root nodes),
+        // fall back to the just-completed node's output.
+        if (parentExecutions.length === 0) {
+          mergedInput = { ...mergedInput, ...(output || {}) };
+        }
 
         // Mark as READY in Redis
         await executionStateManager.setNodeState(
@@ -256,7 +286,14 @@ export class ExecutionService {
           readyNode.nodeId,
           "READY"
         );
+        
+        logger.info("FANIN FIX CHECK", {
+          readyNode: node.name,
+          parentCount: parentExecutions.length,
+          mergedKeys: Object.keys(mergedInput),
+        });
 
+        
         // Push to appropriate queue
         await this.pushNodeToQueue({
           executionId,
@@ -266,7 +303,7 @@ export class ExecutionService {
           nodeName: node.name,
           nodeType: node.type as string,
           nodeConfig: node.config as Record<string, any>,
-          input: output || {},
+          input: mergedInput,
         });
       }
 
