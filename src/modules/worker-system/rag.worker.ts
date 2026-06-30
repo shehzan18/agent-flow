@@ -38,16 +38,18 @@ export class RagWorker extends BaseWorker {
         jobId: job.id,
         executionId: data.executionId,
         nodeId: data.nodeId,
+        attempt: job.attemptsMade + 1,
         error: error.message,
       });
 
-      await executionService.handleNodeFailed(
-        data.executionId,
-        data.nodeId,
-        error.message
-      );
+      const isFinalAttempt = job.attemptsMade >= (job.opts.attempts || 3) - 1;
 
-      if (job.attemptsMade >= (job.opts.attempts || 3) - 1) {
+      if (isFinalAttempt) {
+        await executionService.handleNodeFailed(
+          data.executionId,
+          data.nodeId,
+          error.message
+        );
         await queueService.addToDLQ(data, error.message);
       }
 
